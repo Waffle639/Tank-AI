@@ -1,0 +1,22 @@
+# Python compilado
+__pycache__/
+*.py[cod]
+
+# Entorno virtual
+.venv/
+
+# Tests / herramientas
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editor / sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Futuro: modelos y logs de entrenamiento
+models/
+runs/
+logs/
