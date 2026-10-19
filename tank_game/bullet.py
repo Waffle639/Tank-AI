@@ -1,4 +1,3 @@
-"""Bala que rebota en las paredes."""
 import math
 
 from .config import BULLET_LIFETIME, BULLET_RADIUS, BULLET_SPEED, BULLET_SUBSTEPS, DT
@@ -10,7 +9,7 @@ class Bullet:
         self.x, self.y = x, y
         self.vx = math.cos(angle) * BULLET_SPEED
         self.vy = math.sin(angle) * BULLET_SPEED
-        self.owner = owner  # índice del tanque que la disparó
+        self.owner = owner  # index of the tank that shot it
         self.age = 0.0
 
     @property
@@ -21,8 +20,8 @@ class Bullet:
         self.age = BULLET_LIFETIME
 
     def update(self, walls):
-        """Avanza un tick rebotando en las paredes (eje a eje, en sub-pasos)."""
         self.age += DT
+        # Small steps so it can't pass through thin walls; bounce per axis
         step = DT / BULLET_SUBSTEPS
         for _ in range(BULLET_SUBSTEPS):
             self.x += self.vx * step

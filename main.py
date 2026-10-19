@@ -1,8 +1,8 @@
-"""Juego de tanques en laberinto para 2 jugadores.
+"""Two-player tank maze game.
 
-J1: W/S avanzar/retroceder, A/D girar, Espacio disparar
-J2: Flechas arriba/abajo avanzar/retroceder, Izq/Der girar, Enter disparar
-R reinicia, Esc sale.
+P1: W/S move, A/D turn, Space shoot
+P2: Up/Down move, Left/Right turn, Enter shoot
+R restart, Esc quit
 """
 import pygame
 
@@ -41,7 +41,7 @@ def main():
             if pause == 0 and game.winner is not None:
                 score[game.winner] += 1
             pause += DT
-            if pause > 1.5:  # mostrar el resultado un momento y nuevo mapa
+            if pause > 1.5:  # show result, then new map
                 game.reset()
                 pause = 0.0
 

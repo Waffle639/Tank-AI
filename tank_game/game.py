@@ -1,4 +1,4 @@
-"""Lógica de una ronda: no dibuja nada, se puede usar sin ventana para simular."""
+"""Game logic only (no drawing), so it can run without a window."""
 import math
 import random
 
@@ -19,6 +19,7 @@ class Game:
         self.wall_polys = [rect_corners(w) for w in self.walls]
         cells = [(x, y) for x in range(COLS) for y in range(ROWS)]
         a, b = rng.sample(cells, 2)
+        # Spawn the tanks far from each other
         while abs(a[0] - b[0]) + abs(a[1] - b[1]) < (COLS + ROWS) // 2:
             a, b = rng.sample(cells, 2)
         self.tanks = [
@@ -27,9 +28,9 @@ class Game:
         ]
         self.bullets = []
         self.time = 0.0
-        self.end_timer = None  # empieza a contar con la primera muerte
+        self.end_timer = None  # starts on the first death
         self.done = False
-        self.winner = None     # 0, 1 o None (empate)
+        self.winner = None     # 0, 1 or None (draw)
 
     def tank_blocked(self, i, x, y, angle):
         poly = square_corners(x, y, angle)
@@ -39,7 +40,7 @@ class Game:
         return other.alive and polygons_overlap(poly, other.corners())
 
     def push_tank_out(self, i, x, y, angle):
-        """Desplaza el tanque i fuera de paredes y del otro tanque. None si no cabe."""
+        """Move tank i out of walls and the other tank. None if it doesn't fit."""
         other = self.tanks[1 - i]
         obstacles = self.wall_polys + ([other.corners()] if other.alive else [])
         for _ in range(4):
@@ -54,7 +55,7 @@ class Game:
         return None if self.tank_blocked(i, x, y, angle) else (x, y)
 
     def step(self, actions):
-        """actions: una tupla (avanzar, atrás, izquierda, derecha, disparar) por tanque."""
+        """actions: one (forward, back, left, right, shoot) tuple per tank."""
         if self.done:
             return
         self.time += DT
@@ -81,7 +82,7 @@ class Game:
                     break
         self.bullets = [b for b in self.bullets if not b.expired]
 
-        # Tras la primera muerte se esperan unos segundos: el otro aún puede morir
+        # After the first death wait a bit: the other tank can still die
         alive = [i for i, t in enumerate(self.tanks) if t.alive]
         if len(alive) < 2:
             if self.end_timer is None:

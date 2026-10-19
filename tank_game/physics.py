@@ -1,6 +1,3 @@
-"""Funciones de colisión."""
-
-
 def circle_hits_rect(cx, cy, r, rect):
     nx = min(max(cx, rect.left), rect.right)
     ny = min(max(cy, rect.top), rect.bottom)
@@ -12,12 +9,12 @@ def circle_hits_walls(cx, cy, r, walls):
 
 
 def polygons_overlap(a, b):
-    """Colisión entre dos polígonos convexos (teorema del eje separador)."""
+    """Collision between two convex polygons (separating axis test)."""
     for poly in (a, b):
         for i in range(len(poly)):
             x1, y1 = poly[i]
             x2, y2 = poly[(i + 1) % len(poly)]
-            ax, ay = y1 - y2, x2 - x1  # normal del lado
+            ax, ay = y1 - y2, x2 - x1  # edge normal
             pa = [ax * px + ay * py for px, py in a]
             pb = [ax * px + ay * py for px, py in b]
             if max(pa) <= min(pb) or max(pb) <= min(pa):
@@ -26,7 +23,7 @@ def polygons_overlap(a, b):
 
 
 def polygon_push(a, b):
-    """Vector mínimo (dx, dy) para sacar el polígono a de b, o None si no chocan."""
+    """Smallest (dx, dy) that moves polygon a out of b, or None if not touching."""
     best = None
     for poly in (a, b):
         for i in range(len(poly)):
@@ -37,8 +34,8 @@ def polygon_push(a, b):
             ax, ay = ax / length, ay / length
             pa = [ax * px + ay * py for px, py in a]
             pb = [ax * px + ay * py for px, py in b]
-            forward = max(pb) - min(pa)   # empujar a en +eje
-            backward = max(pa) - min(pb)  # empujar a en -eje
+            forward = max(pb) - min(pa)   # push a along +axis
+            backward = max(pa) - min(pb)  # push a along -axis
             if forward <= 0 or backward <= 0:
                 return None
             if best is None or min(forward, backward) < best[0]:
