@@ -27,6 +27,7 @@ class Game:
             Tank((b[0] + 0.5) * CELL, (b[1] + 0.5) * CELL, rng.uniform(0, 2 * math.pi), BLUE),
         ]
         self.bullets = []
+        self.kills = []        # (killer, victim); killer == victim is a self-kill
         self.time = 0.0
         self.end_timer = None  # starts on the first death
         self.done = False
@@ -75,9 +76,10 @@ class Game:
 
         for b in self.bullets:
             b.update(self.walls)
-            for tank in self.tanks:
+            for j, tank in enumerate(self.tanks):
                 if tank.alive and tank.hit_by(b.x, b.y, BULLET_RADIUS):
                     tank.alive = False
+                    self.kills.append((b.owner, j))
                     b.kill()
                     break
         self.bullets = [b for b in self.bullets if not b.expired]

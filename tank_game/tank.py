@@ -1,6 +1,7 @@
 import math
 
 from .config import BACK_SPEED, BULLET_RADIUS, DT, SHOOT_COOLDOWN, TANK_SIZE, TANK_SPEED, TURN_SPEED
+from .physics import ray_box
 
 
 def square_corners(x, y, angle):
@@ -61,3 +62,11 @@ class Tank:
         h = TANK_SIZE / 2
         nx, ny = min(max(lx, -h), h), min(max(ly, -h), h)
         return (lx - nx) ** 2 + (ly - ny) ** 2 < r * r
+
+    def ray_hit(self, ox, oy, dx, dy, r):
+        """Distance along a unit ray to the tank (grown by r), or None."""
+        c, s = math.cos(self.angle), math.sin(self.angle)
+        lx, ly = (ox - self.x) * c + (oy - self.y) * s, -(ox - self.x) * s + (oy - self.y) * c
+        h = TANK_SIZE / 2 + r
+        hit = ray_box(lx, ly, dx * c + dy * s, -dx * s + dy * c, -h, -h, h, h)
+        return hit[0] if hit else None

@@ -1,3 +1,6 @@
+import math
+
+
 def circle_hits_rect(cx, cy, r, rect):
     nx = min(max(cx, rect.left), rect.right)
     ny = min(max(cy, rect.top), rect.bottom)
@@ -42,6 +45,26 @@ def polygon_push(a, b):
                 best = (forward, ax, ay) if forward < backward else (backward, -ax, -ay)
     depth, ax, ay = best
     return ax * depth, ay * depth
+
+
+def ray_box(ox, oy, dx, dy, left, top, right, bottom):
+    """Distance along a unit ray to an axis-aligned box and the axis it hits ("x" or "y"), or None."""
+    t_near, t_far, axis = -math.inf, math.inf, None
+    for o, d, lo, hi, name in ((ox, dx, left, right, "x"), (oy, dy, top, bottom, "y")):
+        if d == 0:
+            if o < lo or o > hi:
+                return None
+            continue
+        t1, t2 = (lo - o) / d, (hi - o) / d
+        if t1 > t2:
+            t1, t2 = t2, t1
+        if t1 > t_near:
+            t_near, axis = t1, name
+        t_far = min(t_far, t2)
+    # Starting inside or on the box is no hit, so a bounced ray can leave the wall
+    if t_near <= 1e-9 or t_near > t_far:
+        return None
+    return t_near, axis
 
 
 def rect_corners(r):

@@ -33,4 +33,3 @@ def draw(screen, game, score, font):
         msg = "Draw" if game.winner is None else f"{NAMES[game.winner]} wins"
         text = font.render(msg, True, (0, 0, 0))
         screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HUD + HEIGHT // 2))
-    pygame.display.flip()

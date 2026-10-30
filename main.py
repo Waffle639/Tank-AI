@@ -2,10 +2,11 @@
 
 P1: W/S move, A/D turn, Space shoot
 P2: Up/Down move, Left/Right turn, Enter shoot
-R restart, Esc quit
+R restart, F1 show what the AI sees, Esc quit
 """
 import pygame
 
+from rl.debug import draw_debug
 from tank_game.config import DT, FPS, HEIGHT, HUD, WIDTH
 from tank_game.game import Game
 from tank_game.renderer import draw
@@ -20,6 +21,7 @@ def main():
     game = Game()
     score = [0, 0]
     pause = 0.0
+    debug = False
 
     while True:
         for event in pygame.event.get():
@@ -29,6 +31,8 @@ def main():
             if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
                 game.reset()
                 pause = 0.0
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_F1:
+                debug = not debug
 
         k = pygame.key.get_pressed()
         actions = [
@@ -46,6 +50,9 @@ def main():
                 pause = 0.0
 
         draw(screen, game, score, font)
+        if debug:
+            draw_debug(screen, game)
+        pygame.display.flip()
         clock.tick(FPS)
 
 

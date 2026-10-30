@@ -39,7 +39,7 @@ The goal: an agent that learns to play perfectly **only from experience**. It ge
 
 ```bash
 uv pip install pygame-ce
-python main.py
+python3 main.py
 ```
 
 | Player | Move | Turn | Shoot |
