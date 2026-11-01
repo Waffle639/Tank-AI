@@ -47,3 +47,11 @@ def make_maze(rng):
             if y < ROWS - 1 and down[y][x]:
                 walls.append(pygame.Rect(x * CELL - h, (y + 1) * CELL - h, CELL + WALL, WALL))
     return walls
+
+
+def maze_graph(walls):
+    """Open neighbours of every cell: two cells connect if no wall covers the middle of their shared edge."""
+    return {(x, y): [(nx, ny) for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1))
+                     if 0 <= nx < COLS and 0 <= ny < ROWS
+                     and not any(w.collidepoint((x + nx + 1) * CELL / 2, (y + ny + 1) * CELL / 2) for w in walls)]
+            for x in range(COLS) for y in range(ROWS)}

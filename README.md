@@ -44,7 +44,9 @@ python3 main.py
 
 | Player | Move | Turn | Shoot |
 |---|---|---|---|
-| Red  | W / S | A / D | Space |
-| Blue | ↑ / ↓ | ← / → | Enter |
+| Red  | ↑ / ↓ | ← / → | Enter |
+| Blue | W / S | A / D | Space |
 
 `R` restarts the round, `Esc` quits.
+
+`python3 main.py models` puts the newest trained version in Red's seat, so you play Blue with W/A/S/D + Space.

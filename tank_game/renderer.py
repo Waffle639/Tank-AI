@@ -21,7 +21,8 @@ def draw(screen, game, score, font):
     for b in game.bullets:
         pygame.draw.circle(screen, (20, 20, 20), (b.x, b.y + HUD), BULLET_RADIUS)
 
-    text = font.render(f"{NAMES[0]} {score[0]}  -  {score[1]} {NAMES[1]}", True, (0, 0, 0))
+    # Blue (the tank that learns) first
+    text = font.render(f"{NAMES[1]} {score[1]}  -  {score[0]} {NAMES[0]}", True, (0, 0, 0))
     screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HUD // 2 - text.get_height() // 2))
     # Small countdown (top right) until the survivor gets the point
     alive = [i for i, t in enumerate(game.tanks) if t.alive]

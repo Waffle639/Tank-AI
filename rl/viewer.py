@@ -13,7 +13,7 @@ from tank_game.renderer import draw
 
 GRID_COLS = 4
 SCALE = 1 / 3
-VIEW_FPS = 10
+VIEW_FPS = 5
 HEADER = 28  # global stats bar
 LABEL = 18   # line above each env
 
@@ -48,9 +48,9 @@ class Viewer(BaseCallback):
 
         self.screen.fill((200, 200, 190))
         sp, rounds = self.selfplay, self.selfplay.rounds
-        rate = {k: sum(r[k] for r in rounds) / max(len(rounds), 1) for k in ("win", "timeout", "self_kill")}
+        rate = sp.rates()
         speed = (self.num_timesteps - self.start[1]) / (time.time() - self.start[0])
-        header = (f"training v{sp.version + 1}  |  iter {sp.iteration()}  |  {self.num_timesteps // 1000}k steps"
+        header = (f"training v{sp.version + 1:03d} vs {sp.pool}  |  iter {sp.iteration()}  |  {self.num_timesteps // 1000}k steps"
                 f"  |  {speed:.0f} steps/s  |  last {len(rounds)} rounds: win {rate['win']:.0%}"
                 f"  timeout {rate['timeout']:.0%}  self-kill {rate['self_kill']:.0%}")
         self.screen.blit(self.font.render(header, True, (0, 0, 0)), (8, 7))

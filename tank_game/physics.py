@@ -1,5 +1,6 @@
 import math
 
+import numpy as np
 import pygame
 
 
@@ -69,6 +70,23 @@ def ray_box(ox, oy, dx, dy, left, top, right, bottom):
     if t_near <= 1e-9 or t_near > t_far:
         return None
     return t_near, axis
+
+
+def ray_boxes(ox, oy, dx, dy, boxes):
+    """ray_box for many rays against many boxes at once, in numpy (the hottest code of the AI's observation).
+
+    dx, dy: one value or an array (one per ray). boxes: (n, 4) array of left, top, right, bottom.
+    Returns, per ray, the distance to the nearest box (inf if none) and whether it hit an "x" side.
+    """
+    dx, dy = np.atleast_1d(dx, dy)
+    with np.errstate(divide="ignore", invalid="ignore"):  # d == 0 gives +-inf, which the slab test handles
+        tx = (boxes[:, [0, 2]] - ox) / dx[:, None, None]  # rays x boxes x 2
+        ty = (boxes[:, [1, 3]] - oy) / dy[:, None, None]
+    near_x, near_y = tx.min(2), ty.min(2)
+    t_near = np.maximum(near_x, near_y)
+    t = np.where((t_near > 1e-9) & (t_near <= np.minimum(tx.max(2), ty.max(2))), t_near, np.inf)
+    rays, k = np.arange(len(t)), t.argmin(1)
+    return t[rays, k], near_x[rays, k] >= near_y[rays, k]
 
 
 def rect_corners(r):

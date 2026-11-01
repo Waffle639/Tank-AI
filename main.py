@@ -1,7 +1,7 @@
 """Two-player tank maze game.
 
-P1: W/S move, A/D turn, Space shoot
-P2: Up/Down move, Left/Right turn, Enter shoot
+Red: Up/Down move, Left/Right turn, Enter shoot
+Blue: W/S move, A/D turn, Space shoot
 R restart, F1 show what the AI sees, Esc quit
 
 python main.py models           Red is the newest trained version
@@ -54,8 +54,8 @@ def main():
             ai_buttons = act(ai, game, 0)
         tick += 1
         actions = [
-            ai_buttons if ai else (k[pygame.K_w], k[pygame.K_s], k[pygame.K_a], k[pygame.K_d], k[pygame.K_SPACE]),
-            (k[pygame.K_UP], k[pygame.K_DOWN], k[pygame.K_LEFT], k[pygame.K_RIGHT], k[pygame.K_RETURN]),
+            ai_buttons if ai else (k[pygame.K_UP], k[pygame.K_DOWN], k[pygame.K_LEFT], k[pygame.K_RIGHT], k[pygame.K_RETURN]),
+            (k[pygame.K_w], k[pygame.K_s], k[pygame.K_a], k[pygame.K_d], k[pygame.K_SPACE]),
         ]
         game.step(actions)
 

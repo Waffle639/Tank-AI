@@ -1,7 +1,9 @@
 """What the AI sees: a list of OBS_SIZE numbers in [-1, 1]."""
 import math
+from collections import deque
 
-from tank_game.config import BULLET_LIFETIME, BULLET_RADIUS, BULLET_SPEED, HEIGHT, MAX_BULLETS, WIDTH
+from tank_game.config import (BULLET_LIFETIME, BULLET_RADIUS, BULLET_SPEED, CELL, COLS, HEIGHT, MAX_BULLETS,
+                              ROWS, WIDTH)
 from tank_game.physics import circle_hits_walls, ray_box
 
 N_RAYS = 16
@@ -9,7 +11,8 @@ MAX_BOUNCES = 4
 N_BULLETS = 5
 SCALE = math.hypot(WIDTH, HEIGHT)            # longest distance on the map
 MAX_TRAVEL = BULLET_SPEED * BULLET_LIFETIME  # how far a real bullet flies
-OBS_SIZE = N_RAYS + 6 + 6 + 2 * MAX_BOUNCES + 4 + 2 + 5 * N_BULLETS
+ROUTE_SCALE = COLS * ROWS * CELL             # longer than any path through the maze
+OBS_SIZE = N_RAYS + 6 + 6 + 3 + 2 * MAX_BOUNCES + 4 + 2 + 5 * N_BULLETS
 
 
 def ray_angles(tank):
@@ -70,6 +73,33 @@ def shot_path(game, i):
     return points, None
 
 
+def cell_of(tank):
+    return min(int(tank.x // CELL), COLS - 1), min(int(tank.y // CELL), ROWS - 1)
+
+
+def route(game, i):
+    """Shortest way through the maze from tank i to the other tank.
+
+    Returns (waypoint, length): the center of the next cell to walk into (the enemy
+    itself once we share its cell) and the length of the whole path in px.
+    """
+    me, enemy = game.tanks[i], game.tanks[1 - i]
+    goal, here = cell_of(enemy), cell_of(me)
+    if here == goal:
+        return (enemy.x, enemy.y), math.hypot(enemy.x - me.x, enemy.y - me.y)
+    # BFS from the enemy: how many cells are left to walk from every cell
+    left, queue = {goal: 0}, deque([goal])
+    while queue:
+        c = queue.popleft()
+        for n in game.graph[c]:
+            if n not in left:
+                left[n] = left[c] + 1
+                queue.append(n)
+    nx, ny = min(game.graph[here], key=left.get)
+    wx, wy = (nx + 0.5) * CELL, (ny + 0.5) * CELL
+    return (wx, wy), math.hypot(wx - me.x, wy - me.y) + left[nx, ny] * CELL
+
+
 def hit_info(hit, target):
     """[hits target?, distance until it does] (distance 1 = never)."""
     if hit and hit[0] == target:
@@ -99,6 +129,12 @@ def observe(game, i):
     turn = enemy.angle - me.angle
     obs += [ex, ey, math.hypot(ex, ey), math.sin(turn), math.cos(turn), float(enemy.alive)]
 
+    # Route to the enemy through the maze: direction of the next waypoint, and how long the path is
+    (wx, wy), length = route(game, i)
+    fx, fy = rel(wx, wy)
+    norm = math.hypot(fx, fy) or 1.0
+    obs += [fx / norm, fy / norm, length / ROUTE_SCALE]
+
     # My shot right now: bounce points, does it hit the enemy, does it hit me
     points, hit = shot_path(game, i)
     corners = points[1:1 + MAX_BOUNCES] or [(me.x, me.y)]
@@ -127,6 +163,7 @@ if __name__ == "__main__":
     from rl.reward import reward
     from tank_game.config import WALL
     from tank_game.game import Game
+    from tank_game.maze import maze_graph
 
     game = Game(seed=0)
     rng = random.Random(0)
@@ -136,12 +173,21 @@ if __name__ == "__main__":
             obs = observe(game, i)
             assert len(obs) == OBS_SIZE and all(-1 <= v <= 1 for v in obs), obs
 
+    # The maze graph matches the walls: every inner wall closes exactly one of the edges between cells
+    for seed in range(20):
+        game.reset(seed=seed)
+        edges = sum(len(n) for n in game.graph.values()) // 2
+        assert edges == (COLS - 1) * ROWS + COLS * (ROWS - 1) - (len(game.walls) - 4), seed
+
     # Empty map (border walls only)
     game.reset(seed=0)
     game.walls = game.walls[:4]
+    game.graph = maze_graph(game.walls)
     me, enemy = game.tanks
     me.x, me.y, me.angle = 100, 280, 0
     enemy.x, enemy.y, enemy.angle = 400, 280, math.pi / 2
+    waypoint, length = route(game, 0)
+    assert waypoint == (2.5 * CELL, 4.5 * CELL) and length == math.hypot(75, 35) + 3 * CELL, (waypoint, length)
     assert shot_path(game, 0)[1][0] == 1, "enemy straight ahead"
     enemy.y = 100
     game.walls.append(pygame.Rect(300, 0, WALL, HEIGHT))

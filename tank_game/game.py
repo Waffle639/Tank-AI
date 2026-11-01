@@ -2,9 +2,12 @@
 import math
 import random
 
+import numpy as np
+import pygame
+
 from .bullet import Bullet
-from .config import BLUE, BULLET_RADIUS, CELL, COLS, DT, MAX_BULLETS, RED, ROUND_END_DELAY, ROWS
-from .maze import make_maze
+from .config import BLUE, BULLET_RADIUS, CELL, COLS, DT, MAX_BULLETS, RED, ROUND_END_DELAY, ROWS, TANK_SIZE
+from .maze import make_maze, maze_graph
 from .physics import circle_hits_walls, polygon_push, polygons_overlap, rect_corners
 from .tank import Tank, square_corners
 
@@ -13,10 +16,20 @@ class Game:
     def __init__(self, seed=None):
         self.reset(seed)
 
+    def set_walls(self, walls):
+        """Replace the walls and everything built from them (tests use it to make their own maps)."""
+        self.walls = walls
+        self.wall_polys = [rect_corners(w) for w in walls]
+        self.wall_boxes = np.array([(w.left, w.top, w.right, w.bottom) for w in walls], float)  # for ray_boxes
+        self.graph = maze_graph(walls)  # cell -> open neighbour cells (the AI's route)
+
+    def walls_near(self, x, y):
+        """Indices of the walls a tank centered at (x, y) could touch (half diagonal < TANK_SIZE)."""
+        return pygame.FRect(x - TANK_SIZE, y - TANK_SIZE, 2 * TANK_SIZE, 2 * TANK_SIZE).collidelistall(self.walls)
+
     def reset(self, seed=None):
         rng = random.Random(seed)
-        self.walls = make_maze(rng)
-        self.wall_polys = [rect_corners(w) for w in self.walls]
+        self.set_walls(make_maze(rng))
         cells = [(x, y) for x in range(COLS) for y in range(ROWS)]
         a, b = rng.sample(cells, 2)
         # Spawn the tanks far from each other
@@ -35,7 +48,7 @@ class Game:
 
     def tank_blocked(self, i, x, y, angle):
         poly = square_corners(x, y, angle)
-        if any(polygons_overlap(poly, w) for w in self.wall_polys):
+        if any(polygons_overlap(poly, self.wall_polys[k]) for k in self.walls_near(x, y)):
             return True
         other = self.tanks[1 - i]
         return other.alive and polygons_overlap(poly, other.corners())
@@ -43,7 +56,8 @@ class Game:
     def push_tank_out(self, i, x, y, angle):
         """Move tank i out of walls and the other tank. None if it doesn't fit."""
         other = self.tanks[1 - i]
-        obstacles = self.wall_polys + ([other.corners()] if other.alive else [])
+        # A push moves the tank ~1 px, far less than the margin walls_near leaves
+        obstacles = [self.wall_polys[k] for k in self.walls_near(x, y)] + ([other.corners()] if other.alive else [])
         for _ in range(4):
             moved = False
             for obs in obstacles:

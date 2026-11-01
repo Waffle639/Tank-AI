@@ -5,13 +5,13 @@ import gymnasium as gym
 import numpy as np
 
 from rl.observation import OBS_SIZE, observe
-from rl.reward import maze_distance, maze_graph, reward
+from rl.reward import RoundReward
 from tank_game.config import FPS
 from tank_game.game import Game
 
-FRAME_SKIP = 4                      # game ticks per decision (15 decisions/s)
-MAX_STEPS = 60 * FPS // FRAME_SKIP  # cut the round after 60 s of game time
-SHAPING = 0.5                       # total reward for walking all the way to the enemy (0 = off)
+FRAME_SKIP = 4                              # game ticks per decision (15 decisions/s)
+TIME_LIMIT = 60                             # s of game time, then the round is cut (truncated)
+MAX_STEPS = TIME_LIMIT * FPS // FRAME_SKIP
 STILL = (False,) * 5
 
 
@@ -49,8 +49,7 @@ class TankEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self.game.reset(int(self.np_random.integers(2**31)))
-        self.graph = maze_graph(self.game.walls)
-        self.d0 = self.dist = maze_distance(self.graph, self.game.tanks[1], self.game.tanks[0])
+        self.reward = RoundReward(self.game, 1, TIME_LIMIT)
         self.opponent = self.pool[self.np_random.integers(len(self.pool))]
         self.steps = 0
         return np.array(observe(self.game, 1), np.float32), {}
@@ -65,18 +64,14 @@ class TankEnv(gym.Env):
     def step(self, action):
         game = self.game
         actions = [self.red_action(), tuple(bool(a) for a in action)]
+        r = 0.0
         for _ in range(FRAME_SKIP):
             game.step(actions)
+            r += self.reward.tick()
             if game.done:
                 break
         self.steps += 1
-
-        r = reward(game, 1)
-        if all(t.alive for t in game.tanks):
-            # Reward getting closer, not being close: over a round it adds up to at most SHAPING
-            dist = maze_distance(self.graph, game.tanks[1], game.tanks[0])
-            r += SHAPING * (self.dist - dist) / self.d0
-            self.dist = dist
+        r += self.reward.step()
 
         terminated, truncated = game.done, self.steps >= MAX_STEPS
         info = {}
@@ -99,31 +94,41 @@ if __name__ == "__main__":
     import tempfile
     import time
 
+    import pygame
     from gymnasium.utils.env_checker import check_env
     from stable_baselines3 import PPO
 
-    from tank_game.config import CELL
+    from rl.reward import AIM_BONUS, FAST_WIN_BONUS, SELF_AIM_PENALTY
+    from tank_game.config import WALL
+    from tank_game.maze import maze_graph
 
     env = TankEnv()
     check_env(env)
 
-    # Empty map (border walls only): the maze distance is the grid distance
-    env.reset(seed=0)
-    game = env.game
-    game.walls = game.walls[:4]
-    red, blue = game.tanks
-    red.x, red.y, red.angle = 400, 280, math.pi / 2
-    blue.x, blue.y, blue.angle = 100, 280, 0
-    env.graph = maze_graph(game.walls)
-    env.d0 = env.dist = maze_distance(env.graph, blue, red)
-    assert env.dist == int(red.x // CELL) - int(blue.x // CELL), env.dist
+    def empty_map(extra_walls=()):
+        """Border walls only (plus extra_walls), Blue at (100, 280) facing right, Red still at (400, 280)."""
+        env.reset(seed=0)
+        game = env.game
+        game.walls = game.walls[:4] + list(extra_walls)
+        game.graph = maze_graph(game.walls)
+        red, blue = game.tanks
+        red.x, red.y, red.angle = 400, 280, math.pi / 2
+        blue.x, blue.y, blue.angle = 100, 280, 0
+        env.reward = RoundReward(game, 1, TIME_LIMIT)
 
-    # Red straight ahead, Blue keeps shooting: Blue wins and gets exactly +1 (it never moved)
+    # Red straight ahead, Blue keeps shooting: +1 for the win, the fast-win bonus and AIM_BONUS once (it never moved)
+    empty_map()
     total, done = 0.0, False
     while not done:
         _, r, done, _, info = env.step([0, 0, 0, 0, 1])
         total += r
-    assert info["win"] == 1 and abs(total - 1) < 1e-9, (info, total)
+    expected = 1 + AIM_BONUS + FAST_WIN_BONUS * (1 - env.game.time / TIME_LIMIT)
+    assert info["win"] == 1 and abs(total - expected) < 1e-9, (info, total, expected)
+
+    # A wall right in front of Blue: its shot comes back at it
+    empty_map([pygame.Rect(200, 250, WALL, 60)])
+    _, r, *_ = env.step([0, 0, 0, 0, 1])
+    assert r == -SELF_AIM_PENALTY, r
 
     # A saved model as Red
     with tempfile.TemporaryDirectory() as d:
