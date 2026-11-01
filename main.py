@@ -3,16 +3,31 @@
 P1: W/S move, A/D turn, Space shoot
 P2: Up/Down move, Left/Right turn, Enter shoot
 R restart, F1 show what the AI sees, Esc quit
+
+python main.py models           Red is the newest trained version
 """
+import sys
+from pathlib import Path
+
 import pygame
 
 from rl.debug import draw_debug
+from rl.env import FRAME_SKIP, act, load_model
 from tank_game.config import DT, FPS, HEIGHT, HUD, WIDTH
 from tank_game.game import Game
 from tank_game.renderer import draw
 
 
 def main():
+    ai = None
+    if len(sys.argv) > 1:
+        path = Path(sys.argv[1])
+        if path.is_dir():
+            path = (sorted(path.glob("v*.zip")) or [path / "latest.zip"])[-1]
+        print(f"Red is {path}")
+        ai = load_model(path)
+    ai_buttons, tick = (False,) * 5, 0
+
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT + HUD))
     pygame.display.set_caption("Tank AI")
@@ -35,8 +50,11 @@ def main():
                 debug = not debug
 
         k = pygame.key.get_pressed()
+        if ai and tick % FRAME_SKIP == 0:  # the AI decides as often as it did in training
+            ai_buttons = act(ai, game, 0)
+        tick += 1
         actions = [
-            (k[pygame.K_w], k[pygame.K_s], k[pygame.K_a], k[pygame.K_d], k[pygame.K_SPACE]),
+            ai_buttons if ai else (k[pygame.K_w], k[pygame.K_s], k[pygame.K_a], k[pygame.K_d], k[pygame.K_SPACE]),
             (k[pygame.K_UP], k[pygame.K_DOWN], k[pygame.K_LEFT], k[pygame.K_RIGHT], k[pygame.K_RETURN]),
         ]
         game.step(actions)

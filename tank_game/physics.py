@@ -1,5 +1,7 @@
 import math
 
+import pygame
+
 
 def circle_hits_rect(cx, cy, r, rect):
     nx = min(max(cx, rect.left), rect.right)
@@ -8,7 +10,9 @@ def circle_hits_rect(cx, cy, r, rect):
 
 
 def circle_hits_walls(cx, cy, r, walls):
-    return any(circle_hits_rect(cx, cy, r, w) for w in walls)
+    # pygame finds the walls touching the circle's box in C; only those get the exact (slower) check
+    near = pygame.FRect(cx - r, cy - r, 2 * r, 2 * r).collidelistall(walls)
+    return any(circle_hits_rect(cx, cy, r, walls[k]) for k in near)
 
 
 def polygons_overlap(a, b):
