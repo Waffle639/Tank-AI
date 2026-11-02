@@ -2,9 +2,11 @@
 import math
 from collections import deque
 
+import numpy as np
+
 from tank_game.config import (BULLET_LIFETIME, BULLET_RADIUS, BULLET_SPEED, CELL, COLS, HEIGHT, MAX_BULLETS,
                               ROWS, WIDTH)
-from tank_game.physics import circle_hits_walls, ray_box
+from tank_game.physics import circle_hits_walls, ray_boxes
 
 N_RAYS = 16
 MAX_BOUNCES = 4
@@ -21,16 +23,8 @@ def ray_angles(tank):
 
 def cast_rays(game, tank):
     """Distance from the tank center to the nearest wall, one per ray angle."""
-    out = []
-    for a in ray_angles(tank):
-        dx, dy = math.cos(a), math.sin(a)
-        best = SCALE
-        for w in game.walls:
-            hit = ray_box(tank.x, tank.y, dx, dy, w.left, w.top, w.right, w.bottom)
-            if hit and hit[0] < best:
-                best = hit[0]
-        out.append(best)
-    return out
+    a = np.array(ray_angles(tank))
+    return np.minimum(ray_boxes(tank.x, tank.y, np.cos(a), np.sin(a), game.wall_boxes)[0], SCALE).tolist()
 
 
 def shot_path(game, i):
@@ -46,14 +40,14 @@ def shot_path(game, i):
         return [], None
     dx, dy = math.cos(tank.angle), math.sin(tank.angle)
     r = BULLET_RADIUS
+    # Walls grown by the bullet radius, so the line bounces where the bullet's edge touches
+    grown = game.wall_boxes + (-r, -r, r, r)
     points, travelled = [(ox, oy)], 0.0
     for _ in range(MAX_BOUNCES + 1):
-        # Walls grown by the bullet radius, so the line bounces where the bullet's edge touches
         dist, axis = MAX_TRAVEL - travelled, None
-        for w in game.walls:
-            hit = ray_box(ox, oy, dx, dy, w.left - r, w.top - r, w.right + r, w.bottom + r)
-            if hit and hit[0] < dist:
-                dist, axis = hit
+        (t,), (x_side,) = ray_boxes(ox, oy, dx, dy, grown)
+        if t < dist:
+            dist, axis = float(t), "x" if x_side else "y"
         target = None
         for j, t in enumerate(game.tanks):
             d = t.ray_hit(ox, oy, dx, dy, r) if t.alive else None
@@ -163,7 +157,7 @@ if __name__ == "__main__":
     from rl.reward import reward
     from tank_game.config import WALL
     from tank_game.game import Game
-    from tank_game.maze import maze_graph
+    from tank_game.physics import ray_box
 
     game = Game(seed=0)
     rng = random.Random(0)
@@ -172,6 +166,11 @@ if __name__ == "__main__":
         for i in (0, 1):
             obs = observe(game, i)
             assert len(obs) == OBS_SIZE and all(-1 <= v <= 1 for v in obs), obs
+            # The numpy rays match the plain one-wall-at-a-time ray_box
+            me = game.tanks[i]
+            for a, d in zip(ray_angles(me), cast_rays(game, me)):
+                hits = [ray_box(me.x, me.y, math.cos(a), math.sin(a), *b) for b in game.wall_boxes]
+                assert abs(min([h[0] for h in hits if h] + [SCALE]) - d) < 1e-9, (a, d)
 
     # The maze graph matches the walls: every inner wall closes exactly one of the edges between cells
     for seed in range(20):
@@ -181,8 +180,7 @@ if __name__ == "__main__":
 
     # Empty map (border walls only)
     game.reset(seed=0)
-    game.walls = game.walls[:4]
-    game.graph = maze_graph(game.walls)
+    game.set_walls(game.walls[:4])
     me, enemy = game.tanks
     me.x, me.y, me.angle = 100, 280, 0
     enemy.x, enemy.y, enemy.angle = 400, 280, math.pi / 2
@@ -190,11 +188,11 @@ if __name__ == "__main__":
     assert waypoint == (2.5 * CELL, 4.5 * CELL) and length == math.hypot(75, 35) + 3 * CELL, (waypoint, length)
     assert shot_path(game, 0)[1][0] == 1, "enemy straight ahead"
     enemy.y = 100
-    game.walls.append(pygame.Rect(300, 0, WALL, HEIGHT))
+    game.set_walls(game.walls + [pygame.Rect(300, 0, WALL, HEIGHT)])
     assert shot_path(game, 0)[1][0] == 0, "wall straight ahead: the bullet comes back"
 
     game.done, game.winner = True, 0
     assert reward(game, 0) == 1 and reward(game, 1) == -1
     game.winner = None
-    assert reward(game, 0) == -0.5
+    assert reward(game, 0) == reward(game, 1) == -1, "both dead is a loss for both"
     print(f"ok: {OBS_SIZE} values per observation")

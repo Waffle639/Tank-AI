@@ -9,14 +9,12 @@ FAST_WIN_BONUS = 1.0    # extra for winning, shrinking to 0 at the time limit: a
 
 
 def reward(game, i):
-    """Only the round result for tank i: win +1, lose -1 (self-kill too), both dead -0.5."""
+    """Only the round result for tank i: win +1, anything else -1 (self-kill and both dead too)."""
     if not game.done:
         return 0.0
-    if game.winner == i:
-        return 1.0
-    if game.winner is None:  # the round only ends with no winner when both tanks died
-        return -0.5
-    return -1.0
+    # Both dead is a loss: at -0.5, dying while killing paid off and draws took ~47% of the rounds
+    # while wins fell from 49% to 33% (v003 -> v006)
+    return 1.0 if game.winner == i else -1.0
 
 
 class RoundReward:

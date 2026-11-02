@@ -18,6 +18,7 @@ Thumbs.db
 
 # Futuro: modelos y logs de entrenamiento
 models/
+models/old-*/
 runs/
 logs/
 CLAUDE.md

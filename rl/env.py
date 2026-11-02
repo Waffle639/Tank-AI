@@ -76,17 +76,20 @@ class TankEnv(gym.Env):
         terminated, truncated = game.done, self.steps >= MAX_STEPS
         info = {}
         if terminated or truncated:
-            info = {"win": float(game.winner == 1), "timeout": float(not terminated),
-                    "self_kill": float((1, 1) in game.kills)}
+            info = {"win": float(game.winner == 1), "draw": float(terminated and game.winner is None),
+                    "timeout": float(not terminated),
+                    "self_kill": float((1, 1) in game.kills), "opponent": self.opponent_name()}
             self.rounds += 1
             if game.winner is not None:
                 self.score[game.winner] += 1
         return np.array(observe(game, 1), np.float32), r, terminated, truncated, info
 
+    def opponent_name(self):
+        return Path(self.opponent).stem if self.opponent else "v0"
+
     def snapshot(self):
         """What the training viewer draws for this env."""
-        name = Path(self.opponent).stem if self.opponent else "v0"
-        return self.game, {"score": self.score, "rounds": self.rounds, "opponent": name}
+        return self.game, {"score": self.score, "rounds": self.rounds, "opponent": self.opponent_name()}
 
 
 if __name__ == "__main__":
@@ -100,7 +103,6 @@ if __name__ == "__main__":
 
     from rl.reward import AIM_BONUS, FAST_WIN_BONUS, SELF_AIM_PENALTY
     from tank_game.config import WALL
-    from tank_game.maze import maze_graph
 
     env = TankEnv()
     check_env(env)
@@ -109,8 +111,7 @@ if __name__ == "__main__":
         """Border walls only (plus extra_walls), Blue at (100, 280) facing right, Red still at (400, 280)."""
         env.reset(seed=0)
         game = env.game
-        game.walls = game.walls[:4] + list(extra_walls)
-        game.graph = maze_graph(game.walls)
+        game.set_walls(game.walls[:4] + list(extra_walls))
         red, blue = game.tanks
         red.x, red.y, red.angle = 400, 280, math.pi / 2
         blue.x, blue.y, blue.angle = 100, 280, 0
