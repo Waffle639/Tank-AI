@@ -13,14 +13,22 @@
   --brain: 220px;
   --gap: 24px;
   --bar: 44px;
-  --chrome: 110px; /* page height that isn't the game: margins and the hints line */
+  --chrome: 140px; /* page height that isn't the game: margins, the hints line and the footer */
+  /* The map's width: as wide as the window allows, but never taller than it (dvh: without the phone's bars) */
+  --fit: calc((100vh - var(--chrome) - var(--bar)) * 1.5);
   color-scheme: dark;
 }
+@supports (height: 100dvh) { :root { --fit: calc((100dvh - var(--chrome) - var(--bar)) * 1.5); } }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body {
+  --game: min(calc(100vw - 32px - var(--brain) - var(--gap)), var(--fit), 1000px);
+  --content: calc(var(--game) + var(--gap) + var(--brain)); /* the game and its brain: the footer lines up with it */
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
   font: 15px/1.45 system-ui, "Segoe UI", -apple-system, "Helvetica Neue", Arial, sans-serif;
@@ -43,10 +51,9 @@ kbd {
 }
 
 /* Layout: the game as big as the screen allows, the AI's brain next to it */
+body:has(.stage[data-brain="off"]) { --game: min(calc(100vw - 32px), var(--fit), 1000px); --content: var(--game); }
 .stage { display: flex; justify-content: center; gap: var(--gap); padding: 20px 16px 0; }
-.game { width: min(calc(100vw - 32px - var(--brain) - var(--gap)), calc((100vh - var(--chrome) - var(--bar)) * 1.5), 1000px); }
-.game { width: min(calc(100vw - 32px - var(--brain) - var(--gap)), calc((100dvh - var(--chrome) - var(--bar)) * 1.5), 1000px); }
-.stage[data-brain="off"] .game { width: min(calc(100vw - 32px), calc((100dvh - var(--chrome) - var(--bar)) * 1.5), 1000px); }
+.game { width: var(--game); }
 .stage[data-brain="off"] .brain { display: none; }
 
 /* The window: the desktop game's score bar and map */
@@ -222,26 +229,52 @@ select {
 #brain-canvas { flex: 1; width: 100%; min-height: 0; }
 .brain-note { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.4; }
 
-footer {
-  width: min(calc(100% - 32px), 1000px);
-  margin: 40px auto 0;
-  padding-bottom: 28px;
+/* Footer: one quiet line at the bottom, lined up with the game */
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 16px;
+  width: var(--content);
+  margin: auto auto 0; /* pushed to the bottom of the screen */
+  padding: 14px 0 18px;
+  border-top: 1px solid var(--line);
   color: var(--muted);
+  font-size: 12.5px;
+}
+.footer p { margin: 0; }
+.footer a { color: inherit; text-decoration: none; }
+.footer a:hover { color: var(--text); text-decoration: underline; }
+.footer nav { display: flex; align-items: center; gap: 4px; }
+.footer button { padding: 2px 8px; border: 0; background: none; color: var(--muted); }
+.footer button:hover { color: var(--text); }
+.github { display: grid; padding: 2px 4px 2px 8px; }
+.github svg { width: 18px; height: 18px; fill: currentColor; }
+
+/* Privacy and Licenses: small notes over the page (native popovers: Esc or a click outside closes them) */
+.note {
+  max-width: min(380px, calc(100vw - 32px));
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 18px 50px rgb(0 0 0 / 0.5);
   font-size: 13px;
 }
-footer p { margin: 8px 0; max-width: 75ch; }
-footer details { margin: 4px 0; }
-footer summary { cursor: pointer; width: fit-content; }
+.note::backdrop { background: rgb(11 13 18 / 0.5); }
+.note h2 { margin: 0 0 6px; font-size: 15px; }
+.note p { margin: 0; color: var(--muted); line-height: 1.5; }
 
 /* Medium screens: no room for the brain next to the map */
 @media (max-width: 900px) {
   .brain { display: none; }
-  .game, .stage[data-brain="off"] .game { width: min(calc(100vw - 32px), calc((100dvh - var(--chrome) - var(--bar)) * 1.5)); }
+  body, body:has(.stage[data-brain="off"]) { --game: min(calc(100vw - 32px), var(--fit)); --content: var(--game); }
 }
 
 /* Narrow screens: the start screen goes under the map */
 @media (max-width: 720px) {
-  .game, .stage[data-brain="off"] .game { width: calc(100vw - 32px); }
+  body, body:has(.stage[data-brain="off"]) { --game: calc(100vw - 32px); }
   .start { position: static; background: none; padding: 20px 0 0; }
   .modes { grid-template-columns: 1fr; }
   .score { font-size: 16px; }

@@ -154,6 +154,21 @@ test("keyboard only: Enter on the start screen plays the AI", async ({ page }) =
   await expect(page.locator("#score")).toContainText("You");
 });
 
+test("footer: GitHub, and the privacy and license notes open and close, with the license files served", async ({ page, request }) => {
+  await openStart(page);
+  await expect(page.getByRole("link", { name: "Source code on GitHub" })).toHaveAttribute("href", "https://github.com/Waffle639/Tank-AI");
+  await page.getByRole("button", { name: "Privacy" }).click();
+  await expect(page.locator("#privacy")).toBeVisible();
+  await expect(page.locator("#privacy")).toContainText("No accounts, cookies, analytics or forms");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#privacy")).toBeHidden();
+  await page.getByRole("button", { name: "Licenses" }).click();
+  await expect(page.locator("#licenses")).toBeVisible();
+  for (const href of await page.locator("#licenses a[href^='licenses/']").evaluateAll((as) => as.map((a) => a.href))) {
+    expect((await request.get(href)).status(), href).toBe(200);
+  }
+});
+
 test("on a phone-sized screen the start screen goes under the map and nothing scrolls sideways", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openStart(page);
