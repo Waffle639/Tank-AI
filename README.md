@@ -1,52 +1,194 @@
+<div align="center">
+
 # Tank AI
 
-A 2D tank duel in a random maze, built as an environment for training an AI with **Reinforcement Learning (RL)**.
+**Two tanks. A random maze. Bullets that bounce.**<br>
+**One of them is teaching itself to play.**
 
-The goal: an agent that learns to play perfectly **only from experience**. It gets no hand-written strategy, no pathfinding and no aiming formulas. It just plays thousands of games and learns from the reward.
+![Python](https://img.shields.io/badge/Python-3.15-3776AB?logo=python&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)
+![Stable-Baselines3](https://img.shields.io/badge/Stable--Baselines3-PPO-5A4FCF)
+![Gymnasium](https://img.shields.io/badge/Gymnasium-env-0081A5)
 
-## The game
+<img src="media/duel.gif" width="460" alt="Two versions of the AI fighting in a random maze">
 
-- Two square tanks in a randomly generated maze (a new map every round).
-- Actions: **forward, backward, turn left, turn right, shoot**.
-- Bullets bounce off walls and last 5 s. Each tank can have up to 5 bullets at once.
-- One hit kills, **including your own bullets**.
-- After the first death there is a short delay before the point is given. If both tanks die, nobody scores.
+[Why it's hard](#why-its-hard) · [What it sees](#what-it-sees) · [Training](#training-against-itself) · [Rewards](#rewards) · [Progress](#progress) · [Play](#play-against-it)
 
-## Why it's a good RL problem
+</div>
 
-- **Bounces** make aiming non-trivial: the best shot is often off a wall, not straight at the enemy.
-- **Self-kills** punish random shooting, so the agent has to learn when *not* to shoot.
-- **Random mazes** stop the agent from memorizing one map, so it has to learn general skills.
-- **Two players** allow **self-play**: the agent trains against copies of itself and keeps getting stronger.
+## Overview
 
-## RL plan
+I made a small tank game, and then an AI that learns it from zero.
 
-1. **Environment**: wrap `Game` in a [Gymnasium](https://gymnasium.farama.org/) env (`reset()` / `step()`). The game logic has no drawing code, so it can run headless and much faster than real time.
-2. **Observations**: what the agent "sees", for example:
-   - its own position, angle and cooldown
-   - raycasts in several directions (distance to walls)
-   - the enemy's relative position and angle
-   - nearby bullets (relative position and velocity)
-3. **Actions**: the 5 buttons, as `MultiBinary(5)` or a small discrete set of combinations.
-4. **Reward**:
-   - `+1` for killing the enemy, `-1` for dying (worse if it was your own bullet)
-   - small shaping rewards at first if learning is too slow (e.g. getting closer or having line of sight), removed later
-5. **Algorithm**: PPO (e.g. Stable-Baselines3) as a first baseline.
-6. **Training**: start against a random or static opponent, then move to **self-play** against older versions of itself.
-7. **Evaluation**: win rate against fixed opponents and older versions, and watching games with the renderer.
+I never told it how to play. No tips, no strategy, no "if the enemy is close, shoot". The only thing it ever hears is whether it **won or lost** the round. From that alone, over millions of decisions and tens of thousands of rounds, it has to work out everything else.
 
-## Run the game
+That's **Reinforcement Learning**: learning by trial and error from a reward. To keep it improving, it trains against the toughest opponents available: its own past versions.
 
-```bash
-uv pip install pygame-ce
-python3 main.py
+## Why it's hard
+
+It sounds simple. It isn't:
+
+- **Its own bullets kill it.** Firing at random is suicide, so it has to learn when *not* to shoot.
+- **Bullets bounce.** The best shot is often off a wall, and so is the one that comes back at you.
+- **The maze is new every round.** It can't memorize a map. It has to learn skills that work anywhere.
+- **It only hears the result.** "You won" arrives seconds after the decisions that actually won it. Working out *which* decisions those were is the heart of the problem.
+- **Its opponent is itself.** Every time it gets better, so does the enemy.
+
+How hard? The first version, playing against a tank that **doesn't even move**, killed itself in 43% of its rounds.
+
+## What it sees
+
+The AI never looks at the screen. Fifteen times a second it gets a list of **70 numbers** and answers by pressing 5 buttons: forward, back, left, right, shoot.
+
+<div align="center">
+<img src="media/inputs.gif" width="720" alt="A game with the AI's debug view, next to the 70 numbers its network receives">
+</div>
+<br>
+
+| About | It knows |
+|---|---|
+| **Its surroundings** | how far the nearest wall is, in 16 directions |
+| **Itself** | where it is, which way it faces, whether it can shoot |
+| **The enemy** | where it is, which way it's aiming, whether it's alive |
+| **The way there** | which way to go through the maze to reach the enemy |
+| **Its own shot** | where a bullet fired *right now* would bounce, and whether it would hit the enemy or itself |
+| **The enemy's shot** | whether the enemy could hit it right now |
+| **Flying bullets** | the 5 closest ones: where they are, how fast they go, and whose they are |
+
+Two of these are a deliberate shortcut. **The way through the maze** and **where a shot would bounce** are worked out by my code, not learned. I give it senses, not strategy: it still has to decide where to go, when to shoot and when to back off. I added them after my first agent kept driving into walls.
+
+<details>
+<summary><b>Technical details</b></summary>
+<br>
+
+- Everything is **relative to the tank**: "40 px ahead and 12 px to the right", not map coordinates. The same situation looks the same anywhere on the map, and a model trained as Blue can play as Red.
+- Everything is **scaled into [-1, 1]**, and angles are given as sin and cos so that 359° and 1° look alike.
+- The route is a breadth-first search over the maze cells. The shot is a ray traced through up to 4 bounces.
+- The game runs at 60 fps and the AI decides every 4 frames, holding its buttons in between.
+- The brain is two small neural networks (two hidden layers of 256 each): one picks the buttons, the other estimates how good the situation is.
+
+</details>
+
+## Training against itself
+
+The AI improves by playing against frozen copies of its past selves. This is called **self-play**.
+
+<div align="center">
+<img src="media/training.gif" width="560" alt="The training window: eight games at once, the score chart and the score against each opponent">
+</div>
+<br>
+
+```mermaid
+flowchart LR
+    B["Blue<br/>(learning)"] -->|"plays thousands of rounds"| R["Red<br/>(a past version)"]
+    R -->|"wins and losses"| L["Blue learns<br/>from them"]
+    L -->|"55% or more against<br/>each opponent?"| V["Blue is frozen as<br/>a new version"]
+    V -->|"one more opponent"| R
 ```
 
-| Player | Move | Turn | Shoot |
-|---|---|---|---|
-| Red  | ↑ / ↓ | ← / → | Enter |
-| Blue | W / S | A / D | Space |
+Only Blue learns. Every round, Red is a past version picked at random, so Blue faces **many different opponents at once**, not just its latest self. This matters: if it only played its newest copy, it would overfit to that one opponent's habits and forget how to beat the older ones, getting stuck in a rock-paper-scissors loop. Mixing in the past versions keeps the old lessons alive.
 
-`R` restarts the round, `Esc` quits.
+Once Blue scores **55% or more against each of them**, it's frozen as the next version and joins the opponents. At the very beginning there are no versions yet, so the first opponent is a tank that just stands still.
 
-`python3 main.py models` puts the newest trained version in Red's seat, so you play Blue with W/A/S/D + Space.
+- **55%, not 50%.** A Blue that's only as good as its rivals could reach 50% by luck. 55% needs a real edge.
+- **Against each one, not on average.** Otherwise "crushes the old versions, loses to the newest" would pass.
+
+<details>
+<summary><b>Technical details</b></summary>
+<br>
+
+- The algorithm is **PPO** (Proximal Policy Optimization) from Stable-Baselines3. It plays a batch of games, then makes the actions that turned out *better than expected* a bit more likely, and caps how much each update can change, so one lucky batch can't wreck what it already knew.
+- Red is picked from the **last 5 versions**, so the pool keeps moving forward as new versions arrive.
+- 8 games run in parallel, one process each. The network is updated every 16,384 steps, and a promotion is checked every 10 updates.
+- A small entropy bonus (`ent_coef=0.01`) keeps some randomness in its choices, so it keeps exploring.
+
+</details>
+
+## Rewards
+
+The reward is the only feedback it gets, so it's kept small and hard to game:
+
+| Event | Reward |
+|---|:---:|
+| Win | **+1**, up to **+2** if it's fast |
+| Loss, self-kill, or both tanks dead | **−1** |
+| Getting closer to the enemy through the maze | up to **+0.5** per round |
+| Firing a shot that will hit the enemy | **+0.3**, once per round |
+| Firing a shot that will hit itself | **−0.3** |
+
+The result is what matters. The small rewards only help at the start, and none can be farmed: driving back and forth earns nothing, and spraying bullets only pays once. There's no penalty for time, because it would make an early self-kill cheaper than playing on.
+
+### What went wrong on the way
+
+| Problem | Fix |
+|---|---|
+| It stopped shooting: self-kills went to 0%, and every round hit the time limit | Gave it the route and the shot prediction, and rewards for good and bad shots |
+| Dying together paid off: draws rose to ~47%, wins fell from 49% to 33% | Both tanks dead is now a plain loss |
+| Promotions were too easy: four versions in 3 minutes | It must beat *each* opponent, not the average |
+| Then none at all: stuck on v002 for over an hour, with ~45% draws | A draw counts as half a win |
+| It became predictable: entropy fell from 3.5 to 0.55 | A small bonus for keeping some randomness |
+| The network seemed too small (two layers of 64) | Two layers of 256, trained again from zero |
+
+## Progress
+
+Every version is logged with how it played when it was frozen. The **score** is wins + half the draws.
+
+| Version | Trained against | Wins | Draws | Self-kills | Score |
+|:---:|:---|:---:|:---:|:---:|:---:|
+| v001 | a tank that stands still | 56% | 34% | 43% | **73%** |
+| v002 | v001 | 34% | 43% | 19% | **56%** |
+| v003 | v001 – v002 | 36% | 42% | 11% | **57%** |
+| v004 | v001 – v003 | 37% | 41% | 11% | **57%** |
+| v005 | v001 – v004 | 46% | 32% | 11% | **62%** |
+| v006 | v001 – v005 | 48% | 30% | 9% | **63%** |
+
+<sub>As of 17 Nov 2026.</sub>
+
+- **It learned to respect its own bullets.** Self-kills went from 43% to 9%.
+- **Steady scores are good news.** The opponents get stronger every time, so scoring 56–63% again and again means every version beats all the ones before it.
+- **Wins are climbing, draws are falling.** Since v002, wins went from 34% to 48% and draws from 43% to 30%, but about 1 round in 3 still ends with both tanks dead.
+
+<details>
+<summary><b>Under the hood</b></summary>
+<br>
+
+Everything runs on the **CPU**. The network is small and is only ever asked about 8 games at a time, so most of the work is simulating the game itself.
+
+- **The game never draws while training.** All the rules live in `tank_game/game.py`, and drawing is a separate step, done only when someone is watching.
+- **Fewer collision checks.** Walls are pre-filtered in C (pygame's `collidelistall`), and all 16 rays are cast against every wall at once with numpy. Together these made the game about **3.7× faster** to simulate.
+- **The right number of threads.** While the games play, the network uses 1 thread, because more only fought the games for the CPU (about 30% slower). While it learns, the games wait, so it takes every core (3.0 s → 2.1 s per update).
+
+```
+tank_game/   the game: rules, physics, maze and drawing
+rl/          what the AI sees, its rewards, the training environment and the training window
+train.py     self-play training
+main.py      play: you against the AI, or two humans
+models/      the saved versions
+```
+
+```bash
+python train.py                # trains, and continues where it left off
+tensorboard --logdir runs      # every stat over time
+```
+
+</details>
+
+## Play against it
+
+You play **Blue**. The AI plays **Red**, using its newest version.
+
+```bash
+git clone https://github.com/Waffle639/Tank-AI.git
+cd Tank-AI
+pip install -r requirements.txt
+python main.py models
+```
+
+| Move | Turn | Shoot | See through its eyes | New map |
+|:---:|:---:|:---:|:---:|:---:|
+| W / S | A / D | Space | **F1** | R |
+
+> [!TIP]
+> Press **F1** in the middle of a game to see what the AI sees: its rays, the route it's taking to reach you, and where both shots would bounce.
+
+It's still learning. It will find you through the maze and shoot off the walls, but it still blows itself up in about 1 round out of 10.

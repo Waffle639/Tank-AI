@@ -16,9 +16,11 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Futuro: modelos y logs de entrenamiento
+# Training outputs. The frozen versions stay in git so anyone can play against them
 models/
-models/old-*/
+!models/v*.zip
+!models/versions.csv
 runs/
 logs/
 CLAUDE.md
+record.py
