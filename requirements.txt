@@ -2,3 +2,5 @@ pygame-ce>=2.5.8
 gymnasium>=1.4.0
 stable-baselines3>=2.9.2
 tensorboard>=2.21.0
+onnx>=1.23.2
+onnxscript>=0.7.2

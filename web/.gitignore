@@ -1,0 +1,8 @@
+node_modules/
+# the built site (npm run build)
+dist/
+# written by `python -m rl.fixtures`, fresh on every CI run
+test/parity/fixtures.json
+# Playwright's results and reports
+test-results/
+playwright-report/

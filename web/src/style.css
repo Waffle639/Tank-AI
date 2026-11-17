@@ -1,0 +1,254 @@
+/* Dark and quiet around the game, like the training viewer (rl/viewer.py); the game itself looks like the
+   desktop one (tank_game/renderer.py). */
+:root {
+  --bg: #0b0d12;
+  --panel: #191c24;
+  --line: #2e3340;
+  --text: #e8ebf2;
+  --muted: #878fa0;
+  --blue: #5a96ff;
+  --red: #eb5a5a;
+  --tank-blue: rgb(60 120 220); /* the game's own colors (tank_game/config.py) */
+  --tank-red: rgb(220 60 60);
+  --brain: 220px;
+  --gap: 24px;
+  --bar: 44px;
+  --chrome: 110px; /* page height that isn't the game: margins and the hints line */
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 system-ui, "Segoe UI", -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+a { color: var(--blue); }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; cursor: pointer; }
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* Layout: the game as big as the screen allows, the AI's brain next to it */
+.stage { display: flex; justify-content: center; gap: var(--gap); padding: 20px 16px 0; }
+.game { width: min(calc(100vw - 32px - var(--brain) - var(--gap)), calc((100vh - var(--chrome) - var(--bar)) * 1.5), 1000px); }
+.game { width: min(calc(100vw - 32px - var(--brain) - var(--gap)), calc((100dvh - var(--chrome) - var(--bar)) * 1.5), 1000px); }
+.stage[data-brain="off"] .game { width: min(calc(100vw - 32px), calc((100dvh - var(--chrome) - var(--bar)) * 1.5), 1000px); }
+.stage[data-brain="off"] .brain { display: none; }
+
+/* The window: the desktop game's score bar and map */
+.window { border-radius: 6px; overflow: hidden; box-shadow: 0 24px 70px rgb(0 0 0 / 0.55); }
+.bar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: var(--bar);
+  background: rgb(200 200 190);
+  color: #000;
+}
+.score { margin: 0; font-size: 21px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.score .blue { color: var(--tank-blue); }
+.score .red { color: var(--tank-red); }
+.notice { position: absolute; right: 12px; top: 50%; translate: 0 -50%; margin: 0; font-size: 14px; font-weight: 700; }
+.notice.blue { color: var(--tank-blue); }
+.notice.red { color: var(--tank-red); }
+.arena { position: relative; }
+#board { display: block; width: 100%; height: auto; aspect-ratio: 840 / 560; background: rgb(235 235 225); }
+#board:focus { outline: none; }
+
+/* The big text in the middle of the map, black like the desktop game's "Red wins" */
+.banner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  margin: 0;
+  color: #000;
+  font-size: clamp(22px, 3.6vw, 38px);
+  font-weight: 800;
+  white-space: nowrap;
+  text-shadow: 0 0 10px rgb(235 235 225), 0 0 4px rgb(235 235 225);
+  pointer-events: none;
+}
+.banner:empty, .stage:not([data-screen="game"]) .banner { display: none; }
+.banner.count { font-size: clamp(56px, 9vw, 110px); }
+.banner.pop { animation: pop 0.3s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes pop { from { scale: 0.6; opacity: 0; } }
+
+/* The start screen, over the live demo */
+.start {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  text-align: center;
+  background: radial-gradient(ellipse at 50% 45%, rgb(11 13 18 / 0.7), rgb(11 13 18 / 0.92));
+}
+.wordmark { margin: 0; font-size: clamp(34px, 5.5vw, 60px); font-weight: 900; letter-spacing: 0.14em; line-height: 1; }
+.wordmark span { color: var(--blue); }
+.pitch { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: min(580px, 100%); }
+.mode {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 18px;
+  text-align: left;
+  background: rgb(25 28 36 / 0.92);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  transition: translate 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.mode h2 { margin: 4px 0 0; font-size: 20px; }
+.mode-text { margin: 0; min-height: 2.9em; color: var(--muted); font-size: 13px; }
+.mode:hover, .mode:focus-within { translate: 0 -3px; }
+.mode.ai:hover, .mode.ai:focus-within { border-color: var(--blue); box-shadow: 0 14px 44px rgb(90 150 255 / 0.25); }
+.mode.pvp:hover, .mode.pvp:focus-within { border-color: var(--red); box-shadow: 0 14px 44px rgb(235 90 90 / 0.2); }
+
+.icon { width: 76px; height: 48px; overflow: visible; }
+.ai .icon { color: var(--blue); }
+.icon .edges path { fill: none; stroke: currentColor; stroke-opacity: 0.28; stroke-width: 1; }
+.icon .nodes circle { fill: currentColor; animation: fire 1.8s ease-in-out infinite; }
+.icon .nodes circle:nth-child(3n + 1) { animation-delay: -0.6s; }
+.icon .nodes circle:nth-child(3n + 2) { animation-delay: -1.2s; }
+@keyframes fire { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+.icon .shot { fill: var(--text); animation: fly 1.2s linear infinite; }
+@keyframes fly { from { transform: translateX(-6px); } to { transform: translateX(6px); } }
+
+.pick { position: relative; z-index: 1; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+
+/* The play button covers its whole card, so the card is the button (the select stays above it) */
+.go {
+  margin-top: 6px;
+  width: 100%;
+  padding: 9px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--blue);
+  color: #0b0d12;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+.pvp .go { background: var(--red); }
+.mode .go::after { content: ""; position: absolute; inset: 0; border-radius: 14px; }
+.go:disabled { background: var(--line); color: var(--muted); cursor: wait; }
+.status { margin: 4px 0 0; color: #f0b43c; font-size: 13px; }
+.status:empty { display: none; }
+
+/* Paused */
+.pause {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  background: rgb(11 13 18 / 0.78);
+  text-align: center;
+}
+.pause h2 { margin: 0 0 6px; font-size: 26px; }
+.pause button { width: 200px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.pause .go { border: 0; background: var(--blue); }
+
+/* The controls, quiet under the game */
+.hints {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 10px 2px 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  opacity: 0.65;
+  transition: opacity 0.2s;
+}
+.hints:hover, .hints:focus-within { opacity: 1; }
+.hints kbd { margin: 0 1px; }
+.toggles { display: flex; gap: 4px; }
+.toggles button { padding: 2px 6px; border: 0; border-radius: 6px; background: none; color: var(--muted); }
+.toggles button:hover { color: var(--text); }
+.toggles button[aria-pressed="true"] { color: var(--blue); }
+.toggles kbd { margin-left: 4px; }
+.stage:not([data-screen="game"]) #pause-button { display: none; }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 6px 2px 0; color: var(--muted); font-size: 12px; }
+.legend .key { display: inline-block; width: 16px; height: 3px; margin-left: 8px; }
+.legend .key:first-child { margin-left: 0; }
+.legend .rays { height: 1px; background: rgb(170 170 170); }
+.legend .route { background: rgb(60 170 60); }
+.legend .shot { height: 2px; background: rgb(255 0 255); }
+
+/* The AI's brain */
+.brain { width: var(--brain); display: flex; flex-direction: column; gap: 10px; }
+.brain-title { margin: 0; font-size: 13px; font-weight: 700; }
+.thinking { color: var(--muted); font-weight: 400; }
+.thinking::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin: 0 6px 1px 2px;
+  border-radius: 50%;
+  background: #48c774;
+  animation: fire 1s ease-in-out infinite;
+}
+#brain-canvas { flex: 1; width: 100%; min-height: 0; }
+.brain-note { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.4; }
+
+footer {
+  width: min(calc(100% - 32px), 1000px);
+  margin: 40px auto 0;
+  padding-bottom: 28px;
+  color: var(--muted);
+  font-size: 13px;
+}
+footer p { margin: 8px 0; max-width: 75ch; }
+footer details { margin: 4px 0; }
+footer summary { cursor: pointer; width: fit-content; }
+
+/* Medium screens: no room for the brain next to the map */
+@media (max-width: 900px) {
+  .brain { display: none; }
+  .game, .stage[data-brain="off"] .game { width: min(calc(100vw - 32px), calc((100dvh - var(--chrome) - var(--bar)) * 1.5)); }
+}
+
+/* Narrow screens: the start screen goes under the map */
+@media (max-width: 720px) {
+  .game, .stage[data-brain="off"] .game { width: calc(100vw - 32px); }
+  .start { position: static; background: none; padding: 20px 0 0; }
+  .modes { grid-template-columns: 1fr; }
+  .score { font-size: 16px; }
+  .notice { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner.pop, .icon .nodes circle, .icon .shot, .thinking::before { animation: none; }
+  .mode { transition: none; }
+}

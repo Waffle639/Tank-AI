@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tank AI</title>
+  <meta name="description" content="A tank duel in a random maze against an AI that taught itself to play with reinforcement learning.">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='2' width='12' height='12' rx='2' fill='%233c78dc'/%3E%3Crect x='7' y='0' width='2' height='8' fill='%231e1e1e'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">{ "imports": { "onnxruntime-web": "./vendor/ort.wasm.bundle.min.mjs" } }</script>
+  <script type="module" src="main.js"></script>
+</head>
+<body>
+  <main id="stage" class="stage" data-screen="menu" data-brain="on">
+    <div class="game">
+      <!-- The desktop game's window: the score bar over the map -->
+      <div class="window">
+        <div class="bar">
+          <p id="score" class="score"></p>
+          <p id="notice" class="notice" aria-live="polite"></p>
+        </div>
+        <div class="arena">
+          <canvas id="board" tabindex="-1" role="img" aria-label="The maze, seen from above, with the two tanks"></canvas>
+          <p id="banner" class="banner" aria-live="polite"></p>
+
+          <section id="menu" class="start" aria-labelledby="title">
+            <h1 id="title" class="wordmark">TANK <span>AI</span></h1>
+            <p class="pitch">It learned this game from zero, playing against its own past versions.</p>
+            <div class="modes">
+              <div class="mode ai">
+                <svg class="icon" viewBox="0 0 64 40" aria-hidden="true">
+                  <g class="edges">
+                    <path d="M8 8L32 5M8 8L32 15M8 8L32 25M8 8L32 35M8 20L32 5M8 20L32 15M8 20L32 25M8 20L32 35M8 32L32 5M8 32L32 15M8 32L32 25M8 32L32 35M32 5L56 14M32 15L56 14M32 25L56 14M32 35L56 14M32 5L56 26M32 15L56 26M32 25L56 26M32 35L56 26"/>
+                  </g>
+                  <g class="nodes">
+                    <circle cx="8" cy="8" r="3"/><circle cx="8" cy="20" r="3"/><circle cx="8" cy="32" r="3"/>
+                    <circle cx="32" cy="5" r="3"/><circle cx="32" cy="15" r="3"/><circle cx="32" cy="25" r="3"/><circle cx="32" cy="35" r="3"/>
+                    <circle cx="56" cy="14" r="3"/><circle cx="56" cy="26" r="3"/>
+                  </g>
+                </svg>
+                <h2>Play vs AI</h2>
+                <p id="version-info" class="mode-text"></p>
+                <label class="pick">Opponent <select id="version"></select></label>
+                <button id="play-ai" class="go" type="button" disabled>Loading the AI…</button>
+              </div>
+              <div class="mode pvp">
+                <svg class="icon" viewBox="0 0 64 40" aria-hidden="true">
+                  <rect x="1" y="10" width="20" height="20" fill="#3c78dc"/><path d="M11 20H27" stroke="#1e1e1e" stroke-width="4"/>
+                  <rect x="43" y="10" width="20" height="20" fill="#dc3c3c"/><path d="M53 20H37" stroke="#1e1e1e" stroke-width="4"/>
+                  <circle class="shot" cx="32" cy="20" r="2"/>
+                </svg>
+                <h2>2 Players</h2>
+                <p class="mode-text">One keyboard: Blue on WASD, Red on the arrows.</p>
+                <button id="play-pvp" class="go" type="button">Play</button>
+              </div>
+            </div>
+            <p id="status" class="status" role="status"></p>
+          </section>
+
+          <div id="pause" class="pause" role="dialog" aria-labelledby="pause-title" hidden>
+            <h2 id="pause-title">Paused</h2>
+            <button id="resume" class="go" type="button">Resume</button>
+            <button id="restart" type="button">Restart</button>
+            <button id="to-menu" type="button">Menu</button>
+          </div>
+        </div>
+      </div>
+
+      <nav class="hints" aria-label="Controls">
+        <span class="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows to drive · <kbd>Space</kbd> to shoot</span>
+        <span class="toggles">
+          <button id="eyes" type="button" aria-pressed="false">AI view <kbd>F1</kbd></button>
+          <button id="mute" type="button" aria-pressed="false">Mute <kbd>M</kbd></button>
+          <button id="pause-button" type="button">Pause <kbd>Esc</kbd></button>
+        </span>
+      </nav>
+      <p id="legend" class="legend" hidden>
+        <span class="key rays"></span>distance to the walls
+        <span class="key route"></span>its way to the enemy
+        <span class="key shot"></span>a shot that would hit a tank
+      </p>
+    </div>
+
+    <aside class="brain" aria-labelledby="brain-title">
+      <p id="brain-title" class="brain-title"><span id="brain-name"></span> <span class="thinking">thinking</span></p>
+      <canvas id="brain-canvas" role="img" aria-label="The AI's neural network as it decides, 15 times a second"></canvas>
+      <p class="brain-note">Its neural network, live. Each square is a neuron: blue fires one way, amber the other.</p>
+    </aside>
+  </main>
+
+  <footer>
+    <p>Made by Jofre Cuerda · <a href="https://github.com/Waffle639/Tank-AI">Source on GitHub</a> ·
+      <a href="https://github.com/Waffle639/Tank-AI/blob/main/LICENSE">MIT License</a></p>
+    <details>
+      <summary>How it works</summary>
+      <p>The AI learned this game from zero with reinforcement learning, playing tens of thousands of rounds against
+        its own past versions. Each version is a small neural network that gets 70 numbers about the game and answers
+        15 times a second with the buttons it presses. It runs in your browser: nothing is sent to a server.
+        <a href="https://github.com/Waffle639/Tank-AI#readme">The full story</a>.</p>
+    </details>
+    <details>
+      <summary>Privacy</summary>
+      <p>No accounts, no cookies, no analytics, no forms: this page stores nothing on your device and sends nothing
+        anywhere. It is hosted on GitHub Pages, and GitHub logs visitors' IP addresses for security
+        (<a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub's privacy statement</a>).</p>
+    </details>
+    <details>
+      <summary>Credits &amp; licenses</summary>
+      <p>The AI runs in your browser with <a href="https://onnxruntime.ai">ONNX Runtime Web</a> 1.31.1,
+        © Microsoft Corporation, under the <a href="licenses/onnxruntime-LICENSE.txt">MIT License</a>
+        (<a href="licenses/onnxruntime-ThirdPartyNotices.txt">third-party notices</a>).
+        Everything else on this page, sounds included (made in code), is Tank AI, under the MIT License.</p>
+    </details>
+  </footer>
+</body>
+</html>

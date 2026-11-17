@@ -9,6 +9,8 @@
 ![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)
 ![Stable-Baselines3](https://img.shields.io/badge/Stable--Baselines3-PPO-5A4FCF)
 ![Gymnasium](https://img.shields.io/badge/Gymnasium-env-0081A5)
+![ONNX](https://img.shields.io/badge/ONNX-in_the_browser-005CED?logo=onnx&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/License-MIT-48C774)](LICENSE)
 
 <img src="media/duel.gif" width="460" alt="Two versions of the AI fighting in a random maze">
 
@@ -78,31 +80,14 @@ The AI improves by playing against frozen copies of its past selves. This is cal
 </div>
 <br>
 
-```mermaid
-flowchart LR
-    B["Blue<br/>(learning)"] -->|"plays thousands of rounds"| R["Red<br/>(a past version)"]
-    R -->|"wins and losses"| L["Blue learns<br/>from them"]
-    L -->|"55% or more against<br/>each opponent?"| V["Blue is frozen as<br/>a new version"]
-    V -->|"one more opponent"| R
-```
+Only Blue learns, with **PPO** (Proximal Policy Optimization, from Stable-Baselines3). It plays 8 games at once, and after each batch it makes the moves that turned out *better than expected* a little more likely. The steps are small on purpose, so one lucky batch can't undo what it already knew, and a small bonus for staying a bit random keeps it exploring.
 
-Only Blue learns. Every round, Red is a past version picked at random, so Blue faces **many different opponents at once**, not just its latest self. This matters: if it only played its newest copy, it would overfit to that one opponent's habits and forget how to beat the older ones, getting stuck in a rock-paper-scissors loop. Mixing in the past versions keeps the old lessons alive.
+Red is one of Blue's **last 5 versions**, picked at random every round. Facing many opponents at once matters: if it only played its newest copy, it would overfit to that one opponent's habits and forget how to beat the older ones, getting stuck in a rock-paper-scissors loop. Mixing in past versions keeps the old lessons alive.
 
-Once Blue scores **55% or more against each of them**, it's frozen as the next version and joins the opponents. At the very beginning there are no versions yet, so the first opponent is a tank that just stands still.
+Every 10 updates, Blue is checked against each of them. Once it scores **55% or more against every one**, it's frozen as the next version and joins the opponents. At the very beginning there are no versions yet, so the first opponent is a tank that just stands still.
 
 - **55%, not 50%.** A Blue that's only as good as its rivals could reach 50% by luck. 55% needs a real edge.
 - **Against each one, not on average.** Otherwise "crushes the old versions, loses to the newest" would pass.
-
-<details>
-<summary><b>Technical details</b></summary>
-<br>
-
-- The algorithm is **PPO** (Proximal Policy Optimization) from Stable-Baselines3. It plays a batch of games, then makes the actions that turned out *better than expected* a bit more likely, and caps how much each update can change, so one lucky batch can't wreck what it already knew.
-- Red is picked from the **last 5 versions**, so the pool keeps moving forward as new versions arrive.
-- 8 games run in parallel, one process each. The network is updated every 16,384 steps, and a promotion is checked every 10 updates.
-- A small entropy bonus (`ent_coef=0.01`) keeps some randomness in its choices, so it keeps exploring.
-
-</details>
 
 ## Rewards
 
@@ -163,7 +148,8 @@ tank_game/   the game: rules, physics, maze and drawing
 rl/          what the AI sees, its rewards, the training environment and the training window
 train.py     self-play training
 main.py      play: you against the AI, or two humans
-models/      the saved versions
+models/      the saved versions, for training (.zip) and for the browser (.onnx)
+web/         the browser version: the game in JavaScript (src/), its build (scripts/) and its tests (test/)
 ```
 
 ```bash
@@ -175,7 +161,19 @@ tensorboard --logdir runs      # every stat over time
 
 ## Play against it
 
-You play **Blue**. The AI plays **Red**, using its newest version.
+**[Play it in your browser](https://waffle639.github.io/Tank-AI/)**, nothing to install. Pick any version as your opponent and watch its neural network think while it hunts you, or play with a friend on one keyboard.
+
+You play **Blue**. The AI plays **Red**.
+
+| Move | Turn | Shoot | See through its eyes |
+|:---:|:---:|:---:|:---:|
+| W / S | A / D | Space | **F1** |
+
+In the browser the arrows work too, Esc pauses and M mutes. On your machine, R draws a new map.
+
+It's still learning. It will find you through the maze and shoot off the walls, but it still blows itself up in about 1 round out of 10.
+
+To run it on your machine instead:
 
 ```bash
 git clone https://github.com/Waffle639/Tank-AI.git
@@ -184,11 +182,18 @@ pip install -r requirements.txt
 python main.py models
 ```
 
-| Move | Turn | Shoot | See through its eyes | New map |
-|:---:|:---:|:---:|:---:|:---:|
-| W / S | A / D | Space | **F1** | R |
+<details>
+<summary><b>How the browser version works</b></summary>
+<br>
 
-> [!TIP]
-> Press **F1** in the middle of a game to see what the AI sees: its rays, the route it's taking to reach you, and where both shots would bounce.
+The AI was trained in Python with PyTorch, but nobody should have to install PyTorch to play. So the page runs its own copy of everything, with no server:
 
-It's still learning. It will find you through the maze and shoot off the walls, but it still blows itself up in about 1 round out of 10.
+- **The network goes out as ONNX**, the standard format for running a trained model outside the library that trained it. Only the part that picks the buttons is exported: 85,253 numbers in a 341 KB file, instead of the 2 MB training checkpoint, which also holds the network that judges positions and the optimizer's state. The browser runs it with ONNX Runtime Web.
+- **You can watch it think.** The file also gives out what its two hidden layers compute, which adds no weights. The panel next to the map shows one decision from the inside, 15 times a second: the 70 numbers it sees, its 512 neurons, and how likely it is to press each button.
+- **The game is ported to JavaScript.** That makes two copies of the same game, and they must agree: the network only plays well if it gets exactly the 70 numbers it saw in training. So the Python game records moments from real games, hunting for every kind of event (a shot, a bounce, a tank pushed off a wall, a death, the end of a round), and a test checks that the JavaScript computes the same numbers, the same next frame and the same button probabilities. Another set of tests plays the page itself in Chromium, Firefox and WebKit. All of them run on every push, and the site is only published if they pass.
+- **Nothing runs anywhere else.** No input lag and nothing to keep switched on. The heaviest part is the ONNX runtime (14.8 MB before compression), so it loads while you're still in the menu, and the 2-player mode doesn't wait for it.
+
+</details>
+
+--- 
+Any help or feedback is welcome. 🙌

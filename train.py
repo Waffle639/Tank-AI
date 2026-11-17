@@ -22,6 +22,7 @@ from stable_baselines3.common.save_util import load_from_zip_file
 from stable_baselines3.common.vec_env import SubprocVecEnv
 
 from rl.env import TankEnv
+from rl.export import export
 from rl.viewer import Viewer
 
 MODELS = Path("models")
@@ -145,6 +146,7 @@ class SelfPlay(BaseCallback):
             self.version += 1
             name = f"v{self.version:03d}"
             self.model.save(MODELS / name)
+            export(MODELS / f"{name}.zip")  # the file the web demo plays
             log_version({"version": name, "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
                         "steps": self.num_timesteps, "iteration": self.iteration(),
                         "opponents": self.pool, "rounds": len(self.rounds),

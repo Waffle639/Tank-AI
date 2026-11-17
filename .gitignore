@@ -17,10 +17,14 @@ __pycache__/
 Thumbs.db
 
 # Training outputs. The frozen versions stay in git so anyone can play against them
-models/
+# models/* and not models/: git can't re-include files of an ignored directory
+models/*
 !models/v*.zip
+!models/v*.onnx
 !models/versions.csv
 runs/
 logs/
 CLAUDE.md
 record.py
+
+# The web game ignores its own outputs in web/.gitignore
