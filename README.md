@@ -18,6 +18,15 @@
 
 </div>
 
+## Try it live
+
+The AI is online. Play against it in your browser, nothing to install.
+
+
+  <a href="https://waffle639.github.io/Tank-AI/">
+    <img src="https://img.shields.io/badge/▶_Play_now-e63946?style=for-the-badge" height="45">
+  </a>
+
 ## Overview
 
 I made a small tank game, and then an AI that learns it from zero.
